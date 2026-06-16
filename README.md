@@ -1,1 +1,1 @@
-This is a placeholder README.
+Website of InfDEL Lab.
