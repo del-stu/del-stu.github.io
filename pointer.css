@@ -49,7 +49,7 @@
     border-right-style: solid;
 }
 
-@media (pointer: coarse), (max-width: 768px) {
+@media (max-width: 768px) {
     .pointer {
         display: none !important;
     }
