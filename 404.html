@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full select-none overflow-hidden bg-[#080808] text-[#a3a3a3] antialiased">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@1,700&family=Orbitron:wght@900&display=swap" rel="stylesheet">
+  <title>NOT_FOUND - InfDEL Lab</title>
+  <link rel="icon" href="assets/infdel.svg" type="image/svg+xml">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['JetBrains Mono', 'Consolas', 'Courier New', 'monospace'],
+            sans: ['Noto Sans', 'SF Pro Display', 'PingFang SC', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        rgba(18, 18, 18, 0) 50%, 
+        rgba(0, 0, 0, 0.25) 50%
+      ), linear-gradient(
+        90deg,
+        rgba(255, 0, 0, 0.01),
+        rgba(0, 255, 0, 0.005),
+        rgba(0, 0, 255, 0.01)
+      );
+      background-size: 100% 4px, 6px 100%;
+      z-index: 100;
+    }
+
+    .grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
+      background-position: center;
+      mask-image: radial-gradient(circle at center, black 40%, transparent 90%);
+      pointer-events: none;
+    }
+
+    .redacted-text {
+      background-color: #f5f5f5;
+      color: #f5f5f5;
+    }
+  </style>
+</head>
+<body class="relative flex h-full flex-col justify-between font-sans leading-none">
+
+  <div class="scanlines"></div>
+  <div class="grid-bg"></div>
+
+  <main class="relative flex flex-1 flex-col items-center justify-center overflow-hidden">
+    <h1 class="sr-only">ERROR 404 — Page Not Found</h1>
+    <canvas id="interactive-canvas" class="absolute inset-0 block h-full w-full" role="img" aria-label="ERROR 404"></canvas>
+  </main>
+
+  <footer class="relative z-10 flex w-full flex-col justify-between border-t border-neutral-900 px-6 py-8 md:flex-row md:items-end md:px-12 md:py-10">
+    <div class="mb-6 max-w-md md:mb-0">
+      <p class="text-sm md:text-base font-light tracking-wide text-neutral-400 leading-relaxed">
+        The content you requested does not exist, or has been <span class="redacted-text">[REDACTED]</span>.
+      </p>
+    </div>
+
+    <div class="flex flex-col items-start md:items-end space-y-4">
+      <a href="/" class="group font-mono text-sm md:text-base tracking-widest text-neutral-300 transition-colors duration-300 hover:text-white">
+        <span class="sr-only">INDEX.HTML</span>
+        <span class="inline-block transition-transform duration-300 group-hover:hidden" aria-hidden="true">[ ] INDEX.HTML</span>
+        <span class="hidden transition-transform duration-300 group-hover:inline" aria-hidden="true">[→] INDEX.HTML</span>
+      </a>
+    </div>
+  </footer>
+
+  <div id="crosshair-x" class="pointer-events-none fixed inset-x-0 top-0 z-40 h-px bg-neutral-500/50 opacity-0 transition-opacity duration-300"></div>
+  <div id="crosshair-y" class="pointer-events-none fixed inset-y-0 left-0 z-40 w-px bg-neutral-500/50 opacity-0 transition-opacity duration-300"></div>
+  <div id="reticle" class="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-300" style="width: 24px; height: 24px;">
+    <div class="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-none bg-[#f5f5f5]"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('interactive-canvas');
+    const ctx = canvas.getContext('2d');
+    const reticle = document.getElementById('reticle');
+    const crosshairX = document.getElementById('crosshair-x');
+    const crosshairY = document.getElementById('crosshair-y');
+
+    let particles = [];
+    let mouse = {
+      x: null,
+      y: null,
+      glitchRadius: 80,
+    };
+    let dpr = 1;
+    let frameCount = 0;
+    let animationId = null;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let reduceMotion = prefersReducedMotion.matches;
+
+    function updatePointer(x, y) {
+      mouse.x = x;
+      mouse.y = y;
+
+      reticle.style.transform = `translate(${mouse.x}px, ${mouse.y}px) translate(-50%, -50%)`;
+      reticle.style.opacity = '1';
+      crosshairX.style.transform = `translateY(${mouse.y}px)`;
+      crosshairX.style.opacity = '1';
+      crosshairY.style.transform = `translateX(${mouse.x}px)`;
+      crosshairY.style.opacity = '1';
+    }
+
+    function clearPointer() {
+      mouse.x = null;
+      mouse.y = null;
+      reticle.style.opacity = '0';
+      crosshairX.style.opacity = '0';
+      crosshairY.style.opacity = '0';
+    }
+
+    window.addEventListener('mousemove', (e) => {
+      updatePointer(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('mouseout', clearPointer);
+
+    window.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      if (touch) {
+        updatePointer(touch.clientX, touch.clientY);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', clearPointer);
+    window.addEventListener('touchcancel', clearPointer);
+
+    class Particle {
+      constructor(x, y) {
+        const logicalWidth = canvas.width / dpr;
+        const logicalHeight = canvas.height / dpr;
+        this.x = Math.random() * logicalWidth; 
+        this.y = Math.random() * logicalHeight;
+        this.baseX = x;
+        this.baseY = y;
+        this.density = (Math.random() * 20) + 10;
+        this.vx = 0;
+        this.vy = 0;
+        this.size = Math.random() * 1.5 + 1;
+        
+        this.alpha = Math.random() * 0.4 + 0.6; 
+        this.glitchAmount = 0;
+        this.targetAlpha = this.alpha;
+      }
+
+      update(frameCount) {
+        let targetX = this.baseX;
+        let targetY = this.baseY;
+
+        if (mouse.x === null && mouse.y === null) {
+          targetX += Math.sin(frameCount * 0.025 + this.baseY * 0.06) * 2;
+          targetY += Math.cos(frameCount * 0.025 + this.baseX * 0.06) * 2;
+        }
+
+        let dx = targetX - this.x;
+        let dy = targetY - this.y;
+        
+        let forceX = dx * 0.15;
+        let forceY = dy * 0.15;
+
+        if (mouse.x !== null && mouse.y !== null) {
+          let mdx = mouse.x - this.baseX;
+          let mdy = mouse.y - this.baseY;
+          let distance = Math.sqrt(mdx * mdx + mdy * mdy);
+
+          if (distance < mouse.glitchRadius) {
+            let force = (mouse.glitchRadius - distance) / mouse.glitchRadius;
+            this.glitchAmount = force;
+
+            let jitterIntense = force * this.density * 0.3;
+            let xjitter = (Math.random() - 0.5) * jitterIntense;
+            let yjitter = (Math.random() - 0.5) * jitterIntense;
+
+            if (Math.random() < 0.01 * force) {
+              const logicalWidth = canvas.width / dpr;
+              const logicalHeight = canvas.height / dpr;
+              xjitter += (Math.random() - 0.5) * logicalWidth * 0.04;
+              yjitter += (Math.random() - 0.5) * logicalHeight * 0.04;
+            }
+
+            forceX += xjitter;
+            forceY += yjitter;
+
+            this.alpha = Math.random() * 0.8 + 0.2;
+          } else {
+            this.glitchAmount = 0;
+            this.alpha += (Math.random() * 0.4 + 0.6 - this.alpha) * 0.1;
+          }
+        } else {
+          this.glitchAmount = 0;
+          this.alpha += (Math.random() * 0.4 + 0.6 - this.alpha) * 0.1;
+        }
+
+        this.vx += forceX;
+        this.vy += forceY;
+        this.vx *= 0.8; 
+        this.vy *= 0.8;
+
+        this.x += this.vx;
+        this.y += this.vy;
+      }
+
+      draw() {
+        ctx.fillStyle = `rgba(245, 245, 245, ${this.alpha})`;
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+      }
+    }
+
+    // Init particles, generate a text, and extract its pixel data
+    function initMatrix() {
+      particles = [];
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      const logicalWidth = canvas.width / dpr;
+      const logicalHeight = canvas.height / dpr;
+      const scale = window.innerWidth < 768 ? 0.75 : 1.25;
+      tempCanvas.width = 600 * scale;
+      tempCanvas.height = 100 * scale;
+
+      // Draw the text on the off-screen canvas
+      tempCtx.fillStyle = '#fff';
+      tempCtx.textBaseline = 'top';
+      tempCtx.font = `900 ${75 * scale}px "Orbitron", "Impact", "JetBrains Mono", monospace`;
+      tempCtx.textAlign = 'center';
+      tempCtx.fillText('ERROR 404', tempCanvas.width / 2, 5 * scale);
+
+      // Get pixel data from the text
+      const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const data = imgData.data;
+      const step = window.innerWidth < 768 ? 3 : 2;
+      const offsetX = (logicalWidth - tempCanvas.width) / 2;
+      const offsetY = (logicalHeight - tempCanvas.height) / 2;
+      for (let y = 0; y < tempCanvas.height; y += step) {
+        for (let x = 0; x < tempCanvas.width; x += step) {
+          const alphaIndex = ((y * tempCanvas.width) + x) * 4 + 3;
+          if (data[alphaIndex] > 128) {
+            particles.push(new Particle(
+              x + offsetX + (Math.random() * 2 - 1), 
+              y + offsetY + (Math.random() * 2 - 1)
+            ));
+          }
+        }
+      }
+
+    }
+
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      canvas.width = canvas.clientWidth * dpr;
+      canvas.height = canvas.clientHeight * dpr;
+      ctx.scale(dpr, dpr);
+
+      initMatrix();
+      if (reduceMotion) {
+        drawStatic();
+      }
+    }
+
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(resize, 200);
+    });
+
+    function drawStatic() {
+      const logicalWidth = canvas.width / dpr;
+      const logicalHeight = canvas.height / dpr;
+
+      ctx.fillStyle = '#080808';
+      ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+      for (let i = 0; i < particles.length; i++) {
+        particles[i].draw();
+      }
+    }
+
+    function startAnimation() {
+      if (animationId || reduceMotion) return;
+      animate();
+    }
+
+    function stopAnimation() {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    }
+
+    function animate() {
+      frameCount++;
+      
+      const logicalWidth = canvas.width / dpr;
+      const logicalHeight = canvas.height / dpr;
+
+      ctx.fillStyle = 'rgba(8, 8, 8, 0.25)';
+      ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+      // Update and draw all particles
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.update(frameCount);
+        p.draw();
+      }
+
+      animationId = requestAnimationFrame(animate);
+    }
+
+    function handleMotionPreference() {
+      reduceMotion = prefersReducedMotion.matches;
+      if (reduceMotion) {
+        stopAnimation();
+        drawStatic();
+        reticle.style.display = 'none';
+        crosshairX.style.display = 'none';
+        crosshairY.style.display = 'none';
+      } else {
+        reticle.style.display = '';
+        crosshairX.style.display = '';
+        crosshairY.style.display = '';
+        startAnimation();
+      }
+    }
+
+    prefersReducedMotion.addEventListener('change', handleMotionPreference);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopAnimation();
+      } else if (!reduceMotion) {
+        startAnimation();
+      }
+    });
+
+    window.onload = function() {
+      resize();
+      handleMotionPreference();
+    };
+  </script>
+</body>
+</html>
