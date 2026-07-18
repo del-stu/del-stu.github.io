@@ -1,0 +1,46 @@
+#crosshair-x {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 40;
+  height: 1px;
+  background-color: rgba(115, 115, 115, 0.5);
+  opacity: 0;
+  transition: opacity 300ms;
+  pointer-events: none;
+}
+
+#crosshair-y {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 40;
+  width: 1px;
+  background-color: rgba(115, 115, 115, 0.5);
+  opacity: 0;
+  transition: opacity 300ms;
+  pointer-events: none;
+}
+
+#reticle {
+  position: fixed;
+  z-index: 50;
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 300ms;
+  pointer-events: none;
+}
+
+#reticle > div {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  transform: translate(-50%, -50%);
+  background-color: #f5f5f5;
+}
